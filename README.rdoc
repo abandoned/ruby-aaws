@@ -1,0 +1,140 @@
+= Ruby/AWS - A Ruby interface to the Amazon Associates Web Services API.
+
+== Introduction
+
+Ruby/AWS is a Ruby language library that allows programmatic access to
+the popular Amazon Web sites via the AWS v4 API. It is the successor to the
+now obsolete Ruby/Amazon.
+
+In addition to the original
+amazon.com[http://www.amazon.com/exec/obidos/redirect-home/calibanorg-20]
+site, the local sites
+amazon.co.uk[http://www.amazon.co.uk/exec/obidos/redirect-home/caliban-21],
+amazon.de[http://www.amazon.de/exec/obidos/redirect-home/calibanorg0a-21],
+amazon.fr[http://www.amazon.fr/exec/obidos/redirect-home/caliban08-21],
+amazon.ca[http://www.amazon.ca/exec/obidos/redirect-home/caliban-20] and
+amazon.co.jp[http://www.amazon.co.jp/exec/obidos/redirect-home/calibanorg-20]
+are also supported.
+
+Although the library is still in development, the AWS v4 API is now more or
+less fully supported, with only tiny gaps in the functionality of some
+operations.
+
+The following operations are supported:
+
+ BrowseNodeLookup
+ CustomerContentLookup
+ CustomerContentSearch
+ Help
+ ItemLookup
+ ItemSearch
+ ListLookup
+ ListSearch
+ SellerListingLookup
+ SellerListingSearch
+ SellerLookup
+ SimilarityLookup
+ TagLookup
+ TransactionLookup
+ VehiclePartLookup
+ VehiclePartSearch
+ VehicleSearch
+
+Remote shopping-carts are also supported. This adds the following operations:
+
+ CartCreate
+ CartAdd
+ CartModify
+ CartClear
+ CartGet
+
+Finally, multiple operations and batch requests are also supported.
+
+Ruby/AWS supports request authentication, using your secret key to sign your
+requests to AWS.
+
+Beyond wrapping features readily available in the AWS API, Ruby/AWS also
+offers advanced features not directly supported by the AWS API, such as the
+ability to retrieve *all* results pages for a particular search, rather than
+having to manually deal with multiple AWS responses of 10 results per page.
+
+You can also retrieve product images and optionally overlay them with
+percentage discount icons.
+
+Another advanced feature is the ability to cache responses returned by AWS.
+If the cache is used (as it is by default), the results of each unique
+search will be cached and used for 24 hours. The cache can be manually
+flushed of all or just the expired entries.
+
+One other useful advanced feature is the ability to determine the
+appropriate Amazon locale for a given client, based on its IP address or
+host name. This allows you to perform AWS operations using the correct
+geographical Amazon site for any given client. German and Austrian clients
+can be made to interact with amazon.de, British and Irish clients with
+amazon.co.uk, etc.
+
+
+== Installation
+
+Please see the +INSTALL+ file supplied with the software for details of how 
+to install Ruby/AWS. You can choose between an installation script and a
+RubyGems[http://www.rubygems.org/] installation.
+
+Note, however, if opting for the gem installation, that Ruby/AWS's RubyForge
+UNIX name is now ruby-aaws. The ruby-aws name was taken by {another
+project}[http://rubyforge.org/projects/ruby-aws/] and this namespace clash
+prevented remote installation of the Ruby/AWS gem.
+
+
+== Prerequisites
+
+Before you can use this library, you need to obtain an Amazon Web Services
+{access key
+ID}[https://aws-portal.amazon.com/gp/aws/developer/registration/index.html].
+
+You should also apply for an {Associates
+account}[http://docs.amazonwebservices.com/AWSECommerceService/2009-11-01/GSG/BecominganAssociate.html],
+although this isn't strictly necessary. If you do not explicitly provide an
+Associates tag in the operations you conduct via Ruby/AWS, the tag of the
+Ruby/AWS author will be used by default.
+
+
+== See Also
+
+Ultimately, the way to get the most from Ruby/AWS is to read the AWS
+documentation to get a feel for what is possible, and then experiment with
+the library to see how the calls to AWS are mapped to the Ruby world. You
+should also review this library's
+RDoc[http://www.ruby-doc.org/core/classes/RDoc.html]
+documentation[http://caliban.org/ruby/ruby-aws/] as well as the
+plain-text +README+ file that came with the archive.
+
+Additionally, there's a
+{mailing-list}[http://caliban.org/mailman/listinfo/ruby-aws] available,
+where you can discuss any Ruby/AWS-related subjects and issues.
+
+Please see the AWS Developer Resources {home
+page}[https://affiliate-program.amazon.com/gp/advertising/api/detail/main.html],
+the Amazon Web Services API
+documentation[http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=5],
+and, in particular, the {release
+notes}[http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=17]
+for definitive information on the capabilities and inner workings of the AWS
+API.
+
+
+== Download
+
+Version 0.8.1
+=== {gzip'ed tar archive}[http://caliban.org/files/ruby/ruby-aws-0.8.1.tar.gz]
+=== {Ruby Gem}[http://caliban.org/files/ruby/ruby-aaws-0.8.1.gem]
+=== {Fedora 12 RPM}[http://caliban.org/files/redhat/RPMS/noarch/ruby-aws-0.8.1-1.fc12.noarch.rpm]
+=== {Fedora 12 doc RPM}[http://caliban.org/files/redhat/RPMS/noarch/ruby-aws-doc-0.8.1-1.fc12.noarch.rpm]
+=== {Fedora 12 source RPM}[http://caliban.org/files/redhat/SRPMS/ruby-aws-0.8.1-1.fc12.src.rpm]
+
+
+---
+Author::   Ian Macdonald <mailto:ian@caliban.org>
+Version::  0.8.1
+Copyright:: (C) 2008-2010 Ian Macdonald
+Licence::  GPL[http://www.gnu.org/copyleft/gpl.html]

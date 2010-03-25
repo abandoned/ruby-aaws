@@ -1,0 +1,808 @@
+$Id: NEWS,v 1.21 2010/03/20 11:56:30 ianmacd Exp $
+
+
+0.8.1 - 2010-03-20
+------------------
+
+1. Operation#query_parameters was faulty, because it had accidentally been
+   defined outside the Operation class.
+
+   This meant that it wasn't in the correct namespace, causing libraries that
+   included Ruby/AWS to place that method in a namespace unreachable by
+   Ruby/AWS itself. Scripts that used Ruby/AWS without defining other modules
+   and classes were unaffected.
+
+2. In determining the home directory location of the .amazonrc file, we were
+   mistakenly concatenating ENV['HOMEDRIVE'] + ENV['HOMEPATH'] without first
+   checking that both were defined.
+
+3. The version of the AWS API used is now 2009-11-01, the latest at the time
+   of writing.
+
+
+0.8.0 - 2010-02-21
+------------------
+
+1. There is a new exception class, ObsolescenceError, which is raised when
+   an obsolete (i.e. no longer available) feature is used.
+
+2. The batching and multiple operation code was basically unmaintainable. I
+   could no longer comprehend it, so I removed and rewrote it from scratch.
+
+3. The implementation of MultipleOperation had a bug, whereby, if the second
+   operation was a batched operation, its parameters would overwrite those of
+   the first operation, leading to too few results returned.
+   
+   This meant that the maximum number of operations that could be encapsulated
+   in a MultipleOperation was 3, not the proper 4, and, even then, only when
+   the batched operation was supplied as the first parameter, not the second.
+
+4. There's a new ResponseGroup#response_group= method, the use of which is
+   transparent to the user. This makes it possible to assign response groups
+   to any kind of operation, even those encapsulated in batched and multiple
+   operations.
+
+5. MultipleOperation.new can now accept an arbitrary number of operations in
+   its parameter list. This list may also be supplied in the form of an array.
+
+   Amazon still impose a maximum of 2 operations encapsulated in a multiple
+   operation, but there's no reason for Ruby/AWS to mirror this. If Amazon
+   later raise the limit, Ruby/AWS will require no modification to take
+   advantage of the new situation.
+
+6. It's now possible to pass two batched operations to MultipleOperation.new,
+   allowing 4 base operations to be sent to AWS in a single request.
+   
+   Note that Amazon still impose a limit of no more than 2 operations of the
+   same class in a single request, which means that to achieve the maximum of
+   4 base operations in a MultipleOperation, one must encapsulate two batched
+   operations of different classes.
+
+7. A MultipleOperation that encapsulates only operations of the same class
+   will be commuted to a batch operation, resulting in the appropriate
+   response from Amazon.
+   
+   For example, a MultipleOperation encapsulating two ItemSearch operations
+   will return an item_search_response, not a multiple_operation_response. A
+   MultipleOperation encapsulating an ItemSearch and an ItemLookup, on the
+   other hand, will still return a multiple_operation_response.
+   
+   Previously, all multiple operations returned a multiple_operation_response.
+
+8. It's no longer possible to pass a list of response groups as the second
+   parameter to Search::Request#search. This facility was deprecated in
+   Ruby/AWS 0.7.0 and has been removed altogether in 0.8.0 (shunting nr_pages
+   into place as the second and final parameter).
+   
+   You must now directly assign to the operation's @response_group attribute.
+
+   In the case of a batched operation or a MultipleOperation, the response
+   groups will automatically propagate to the encapsulated operations.
+
+   An attempt to pass response groups as the second parameter to
+   Search::Request#search will now yield an ObsolescenceError exception.
+
+9. Attempting to retrieve ALL_PAGES of a multiple page list, such as a
+   WishList, didn't work. Only the first page was retrieved. This is because
+   TotalPages is nested one level deeper in the XML response yielded by this
+   type of operation. The same is true of MultipleOperation responses.
+
+10. Geolocation now associates Belgian clients with amazon.fr, rather than
+    amazon.co.uk. A Belgian client may not necessarily be a Francophone, but
+    this is probably still an improvement.
+
+11. The version of the AWS API used is now 2009-10-01, the latest at the time
+    of writing. ItemSearch::SEARCH_INDICES has been updated with the latest
+    additions, Lighting and Outlet.
+
+12. Ruby/AWS now depends on Ruby 1.8.6, not 1.8.7. This should make life
+    easier for some people, as many Linux distributions still come with 1.8.6.
+
+
+0.7.0 - 2009-06-16
+------------------
+
+1. This release introduces a shorthand module method for each of the AWS
+   operations. These can be used to create less verbose code at the expense of
+   flexibility.
+
+   For example, we might normally write the following code:
+
+     is = ItemSearch.new( 'Books', { 'Title' => 'Ruby' } )
+     rg = ResponseGroup.new( :Large )
+     req = Request.new
+     response = req.search( is, rg )
+     
+   but we could instead use ItemSearch's associated module method as follows:
+
+     response = Amazon::AWS.item_search( 'Books', { 'Title' => 'Ruby' } )
+
+   There are some important restrictions when compared to the standard way of
+   doing things:
+
+   a. Astute readers will note that there's no way to specify to the module
+      methods which response group(s) to use. Instead, a reasonable default
+      set for each type of operation will be used, as per the new
+      ResponseGroup::DEFAULT hash.
+
+      The exception to this is Amazon::AWS.multiple_operation, which has no
+      response groups of its own, instead applying those of the operations it
+      combines.
+
+      Because no access is provided to the Request object used by the module
+      method, it's also not possible to batch operations with Operation#batch
+      when using this form of the search.
+
+      On the other hand, you can use the Amazon::AWS.multiple_operation module
+      method to achieve more or less the same thing:
+
+	Amazon::AWS.multiple_operation( op1, op2 )
+
+      When op1 and op2 are of the same class, the effect is similar to
+      batching two operations. The main difference is in the structure of the
+      XML document returned by AWS.
+
+   b. Similarly, one can't influence the key ID, associate tag, locale, cache
+      or user agent used for the request. These are all set as per
+      ~/.amazonrc.
+   
+      Likewise, the number of results pages to fetch will always be 1.
+
+   c. The module methods have no RDoc documentation, because they are
+      dynamically generated.
+
+   Basically, the short form module methods are there as a convenience, but
+   that convenience comes at the expense of flexibility. If they don't meet
+   your needs, you will have to resort to the standard longhand form.
+
+2. There's now an alternative to passing the list of desired response groups
+   as the second parameter to Request#search.
+
+   The second parameter of that method is now optional and *nil* by default.
+   Instead, you may assign to the response_group attribute of your operation
+   object.
+
+   For example:
+
+   is = ItemSearch.new( 'Books', { 'Title' => 'Ruby' } )
+   is.response_group = ResponseGroup.new( :Large )
+   req = Request.new
+   response = req.search( is )
+
+   Note that the @response_group variable will be initialised at the
+   time the operation object is instantiated. It will be assigned the same
+   reasonable default as used by the equivalent module method, namely
+   that specified by the new ResponseGroup::DEFAULT hash.
+
+   Specifying the desired response groups inside your operation object has at
+   least two advantages over passing the list to Request#search:
+
+   a. You can maintain a separate response group set per operation, rather
+      than having to pass a differen set to Request#search for each operation.
+
+   b. A reasonable default response group set can be used for any given
+      operation if you don't supply one.
+
+3. More and more people are moving to Ruby 1.9, so this release of Ruby/AWS
+   has been tested to work with Ruby 1.9.1p129, the latest version at the time
+   of writing. Attaining compatibility with 1.9 is a little tricky, because of
+   the way in which strings are no longer treated as sequences of bytes in
+   that version. Instead, they have knowledge of their encoding.
+   
+   There may be one or two obscure 1.9-related bugs remaining, but all of the
+   unit tests pass, at least.
+
+4. The signing of requests, introduced in Ruby/AWS 0.6.0, produced problems
+   for people with a version of OpenSSL earlier than 0.9.8.
+   
+   The code will now check whether there is OpenSSL support for the SHA-256
+   Secure Hash Algorithm before attempting to use it. If not, each attempt to
+   sign a request will result in a warning if $DEBUG is used.
+
+   Once again, I remind you that Amazon intends to make request authentication
+   compulsory on 15th August 2009, so this change to Ruby/AWS only lets users
+   with an ancient OpenSSL library off the hook until then.
+
+5. A second bug with the signing of requests occurred on Windows platforms.
+   Requests were not properly timestamped. This was due to deficiencies in the
+   underlying strftime(3) library function, but has now been fixed.
+
+6. Finally, knowledge of a handful of relatively new search indices, such as
+   UnboxVideo, was missing. This has now been added. The AWS documentation is
+   terribly inconsistent in this regard, providing several different, yet
+   supposedly complete lists of valid search indices at various points
+   throughout the document.
+
+
+0.6.0 - 2009-05-26
+------------------
+
+1. Requests to AWS can now be signed in order to authenticate them. Amazon
+   plans to make the signing of requests mandatory as of 15th August 2009, so
+   it is recommended to start doing so now.
+
+   To have your requests automatically signed by Ruby/AWS, simply add the
+   'secret_key_id' parameter to your ~/.amazonrc configuration file. Its value
+   should, rather predictably, be your secret access key, which can be
+   retrieved here:
+
+   https://aws-portal.amazon.com/gp/aws/developer/account/index.html?ie=UTF8&action=access-key
+
+   You needn't be concerned about Amazon's warnings not to show your secret
+   key to anyone else, because it will be used only for signing requests,
+   prior to sending them. The key itself will not be sent over the network to
+   Amazon, even in encrypted form.
+
+   In order to incorporate the new functionality, minor changes had to be made
+   to the way the AWS request URLs are encoded. This change means that
+   previous requests cached by earlier versions of Ruby/AWS will not be found
+   in the cache. This is a minor, one-time inconvenience, and it just means
+   that the requests will be performed and cached again.
+
+2. When Amazon's AWS servers check whether the correct signature has been
+   applied to a request, they recalculate the signature based on the data in
+   the request and check for a match with the signature supplied by Ruby/AWS.
+
+   This introduces a complicating factor, namely the treatment of non-ASCII
+   characters in the request, such as accented letters. When recalculating the
+   signature, Amazon will use the UTF-8 representation of any such characters.
+   This will cause a signature mismatch if you used a different encoding, such
+   as ISO-8859-1 (a.k.a. Latin-1), when you supplied values for your request
+   parameters.
+
+   Ruby/AWS can't (reliably) dynamically determine which character encoding
+   your strings use, so this information can now be supplied via the
+   ~/.amazonrc configuration file, using the 'encoding' parameter. This should
+   be set to whichever encoding you use. If left unset, it defaults to UTF-8.
+   An exception will be raised if you attempt to use an invalid (i.e. unknown)
+   encoding.
+
+   Currently, the encoding you use makes no difference unless your requests
+   are being signed, but because signing will soon be mandatory, I recommend
+   you explicitly state which encoding you intend to use.
+
+   You may also change the encoding in use at any time by assigning to the
+   @encoding instance variable of your Request object.
+
+3. The robustness of the software has been improved by handling the following
+   additional exceptions while communicating with the AWS servers:
+   Errno::ECONNREFUSED, Errno::ECONNABORTED, Errno::ETIMEDOUT and
+   Timeout::Error. Users have reported that all of these occur from time to
+   time, although only Windows platforms seem to suffer from
+   Errno::ECONNABORTED.
+
+4. The version of the AWS API used is now 2009-03-31, the latest at the time
+   of writing.
+
+5. <RANT>
+   Amazon must have appointed a new interim Senior Vice-President of
+   Outward-Facing Moniker Reconciliation or something, because earlier this
+   month, on 8th May, I received an e-mail from Amazon, informing me that the
+   Web service formerly known as Amazon Web Services, latterly the E-Commerce
+   Service, and then, until this month, the Amazon Associates Web Service, is
+   to undergo yet another name change.
+
+   Once again, the reason for the new moniker is that it ostensibly "more
+   accurately reflects the purpose of the API". The new sobriquet is the
+   highly reflective 'Product Advertising API'.
+
+   It never ceases to amaze me that the collective intellectual might of a
+   company as large and resourceful as Amazon cannot, over a period of five
+   years, converge to decisively name an API.
+
+   How long until the reins of responsibility for this offering change hands
+   once again and the next in a growing line of misguided middle managers
+   decides that he can best raise his profile with his superiors by changing
+   the name of the API to "better reflect its purpose"?
+
+   Well, I'm resistant to change, especially stupid, time-wasting changes, so
+   I'll be continuing to refer to AWS as AWS for the foreseeable future. When
+   I say AWS, you'll know I mean the product whose name is woefully subject to
+   Amazon's whimsy.
+
+   The same e-mail informed me that Amazon would soon be introducing mandatory
+   authentication of AWS requests.
+
+   I downloaded the latest developer guide, wrote some code to implement
+   request signatures, and then spent a good couple of hours trying to make my
+   code produce the sample results shown in the developer guide.
+
+   Ultimately, I realised that the sample requests in the developer guide
+   could not have produced the output claimed by the documentation.
+
+   Not only that, but 3 of the 10 steps in the developer guide, in the section
+   detailing how to sign AWS requests, contain critical errors. This means
+   that Amazon didn't once follow their own documentation to verify its
+   correctness.
+
+   Most of the mistakes have since been silently rectified by Amazon, without
+   any mention on the AWS forum or revising the document version. Who knows
+   how often the developer guide changes on a day to day basis. I had thought
+   each dated version to be a static, completed work, but this is apparently
+   not the case.
+   </RANT>
+
+
+0.5.1 - 2009-03-29
+------------------
+
+1. Catch Errno::EPIPE on server connections (Errno::ECONNRESET was already
+   caught). This can occur when the connection times out due to lack of use.
+   Running Ruby in debug mode will print the error message text when such an
+   exception is caught.
+
+2. The version of the AWS API used is now 2009-02-01, the latest at the time
+   of writing.
+
+3. The sequence numbering of shopping cart items incorrectly started from 2
+   instead of 1, but didn't cause a problem in practice.
+
+
+0.5.0 - 2009-02-20
+------------------
+
+1. The configuration files (/etc/amazonrc and typically ~/.amazonrc) are now
+   locale-specific. Global and locale-specific settings can now be placed in
+   their own sections. For example:
+
+   Old style .amazonrc:
+   
+     associate = 'caliban-21'
+     locale = 'uk'
+     cache = false
+     key_id = '0Y44V8FAFNM119C6XYZ2'
+   
+   New style .amazonrc:
+   
+     [global]
+     locale = 'uk'
+     cache = false
+     key_id = '0Y44V8FAFNM119C6XYZ2'
+     
+     [uk]
+     associate = 'calibanorg-21'
+     
+     [us]
+     associate = 'calibanorg-20'
+   
+   
+   The old style of configuration is still supported.
+
+2. ItemLookup.new and SellerListingLookup.new no longer take a third
+   parameter, b_parameters. Instead, the new Operation#batch method can be
+   used to create batch operations.
+
+   Operation#batch can batch multiple operations of any class, not just
+   ItemLookup and SellerListingLookup. The only requirement if that all
+   batched operations must be of the same class.
+
+   If you want to send multiple operations of different classes as a single
+   request, you must still use the MultipleOperation class.
+
+3. VehiclePartLookup, VehiclePartSearch and VehicleSearch operations (which
+   were added in the 2008-08-19 revision of the AWS API, are now supported.
+   However, VehiclePartLookup is the only one of these that currently supports
+   pagination.
+
+4. The list of allowable search indices for ItemSearch operations has been
+   updated in accordance with the latest AWS documentation.
+
+5. Parameter checking for ItemSearch operations no longer occurs. It was
+   impractical to keep the list of valid parameters concurrent with AWS.
+   Related constants have therefore also been removed.
+
+6. The version of the AWS API used is now 2009-01-06, the latest at the time
+   of writing.
+
+   The configuration file now supports a new global parameter for requesting a
+   different version of the API. For example:
+
+     api = '2008-08-19'
+
+7. While testing the ability to request a specific version of the AWS API, I
+   encountered a new kind of AWS error, the internal error, which is reported
+   using a different XML construct to that used for all other error
+   conditions.
+
+   I triggered one of these internal errors when I attempted an operation, a
+   VehicleSearch, that did not yet exist in the older version of the API that
+   I requested.
+
+   This type of error now throws a generic Amazon::AWS::Error::AWSError
+   exception.
+   
+   It's reasonable to assume that there are other conditions that would cause
+   an internal AWS error to occur. These, too, will be raised as an exception.
+   
+   Unfortunately, AWS supplies no information on the cause of such internal
+   errors, so Ruby/AWS is unable to pass on any clues to the user.
+
+
+0.4.4 - 2008-10-03
+------------------
+
+1. It's now possible to have Ruby/AWS use a user configuration file with a
+   name other than .amazonrc. This is achieved by defining $AMAZONRCFILE. If
+   left undefined, the default of .amazonrc is used.
+
+2. Locations other than $HOME were not being checked for .amazonrc. This bug
+   has now been fixed.
+
+
+0.4.3 - 2008-09-22
+------------------
+
+1. $AMAZONRCDIR is now searched for .amazonrc before $HOME and the other
+   directories. This allows a user-defined location to be used for the user
+   configuration file.
+
+2. There is a new top-level class of exception for Ruby/AWS,
+   Amazon::AmazonError.
+
+   Most non-operational exceptions, such as Amazon::AWS::HTTPError,
+   Amazon::Config::ConfigError,
+   Amazon::AWS::Search::Request::AccessKeyIdError,
+   Amazon::AWS::Search::Request::LocaleError and
+   Amazon::AWS::ShoppingCart::CartError are now immediate subclasses of
+   AmazonError. Previously, they were subclasses of StandardError.
+
+3. Amazon::AWS::Error::AWSError was previously a class that generated
+   exceptions, but it's now simply a container class derived from AmazonError.
+   All operational exceptions -- the ones whose class is dynamically created
+   when AWS returns an error -- are now subclasses of AWSError. Previously,
+   they were immediate subclasses of StandardError.
+
+   This has the advantage of allowing all of the exceptions resulting from
+   operational errors to be caught by rescuing just the container class,
+   AWSError.
+       
+
+0.4.2 - 2008-09-11
+------------------
+
+1. The version of the Amazon AWS API requested when performing operations is
+   now 2008-08-19. This is the latest at the time of writing.
+
+2. The exception class Amazon::Config::ConfigError was mysteriously not
+   defined.
+
+3. Amazon::Config.new now accepts an optional argument, config_str, which may
+   contain the string equivalent of a config file's contents. When config_str
+   is not nil (nil is the default), this string is read instead of
+   /etc/amazonrc and ~/.amazonrc. This addition is really just to aid
+   unit-testing of the Amazon::Config class, as Amazon::Config.new never needs
+   to be called by user code.
+
+4. Config file lines may now contain leading whitespace.
+
+5. The Amazon::AWS::MAX_PAGES constant has gone, replaced by the PAGINATION
+   hash. Only ItemSearch should use ItemPage to page through results up to
+   MAX_PAGES when ALL_PAGES has been requested, but the same approach was
+   attempted for all types of operation.
+     
+   Each operation has its own pagination parameter and its own maximum number
+   of pages that can be fetched. This is now stored in the
+   Amazon::AWS::PAGINATION hash.
+        
+   Note that ItemLookup has three possible pagination parameters: OfferPage,
+   VariationPage and ReviewPage. Ruby/AWS uses OfferPage for the purposes of
+   ALL_PAGES.
+	   
+   Operations that do not explicitly provide a pagination parameter (or, at
+   least, those for which there isn't one listed in the AWS Developer's Guide)
+   use ItemPage for pagination up to page 400. In practice, this is likely to
+   throw an exception, as such operations almost certainly don't support
+   multiple results pages.
+
+
+0.4.1 - 2008-08-18
+------------------
+
+1. The exception class Amazon::AWS::HTTPError was not actually defined, which
+   caused an error when an attempt was made to raise an instance of it.
+
+2. If you're using Windows, %HOME% typically isn't defined. Therefore, the
+   following sequence of paths is now searched for your .amazonrc
+   configuration file:
+
+     %HOME%
+     %HOMEDRIVE% + %HOMEPATH%
+     %USERPROFILE%
+     
+   Choose one of these at your convenience.
+
+3. The Ruby/AWS gem has been renamed ruby-aaws (from ruby-aws) to avoid a
+   namespace clash with another project. This clash prevented remote
+   installation of the gem.
+
+
+0.4.0 - 2008-07-05
+------------------
+
+1. The version of the Amazon AWS API requested when performing operations is
+   now 2008-06-26. This is the latest at the time of writing.
+
+2. A new method, Amazon::AWS::ShoppingCart::Cart#cart_get, has been added, to
+   allow the retrieval of an existing shopping-cart from AWS. This is
+   necessary when the original Cart object no longer exists.
+
+3. A bug in Amazon::AWS::ShoppingCart::Cart#cart_modify has been fixed, which
+   caused carts with no items in their active section to raise an exception.
+
+
+0.3.3 - 2008-06-23
+------------------
+
+1. YAML.aws_load has been removed. Its functionality is available directly
+   from Amazon::AWS::AWSObject.yaml_load and it wasn't logical or necessary to
+   duplicate that in the YAML class itself. There was no corresponding
+   Marshal.aws_load method, but if there had been, that, too, would have been
+   removed.
+
+2. Ruby/AWS is finally available as a RubyGems package and can be found here:
+
+     http://www.caliban.org/files/ruby/ruby-aws-0.3.3.gem
+
+   The enclosed Rakefile can be used to build the gem from scratch. First make
+   sure you have rake and rubygems installed, and then simply type 'rake' in
+   the top level directory of the archive. The gem will be generated and
+   placed in the ./pkg subdirectory, from where you can 'sudo gem install' it.
+
+   This is my first gem, so bear with me. It appears to work properly, but I
+   offer no guarantees. One thing that doesn't currently work is installing
+   the package with gem's -t option to run the supplied unit tests.
+
+   More information about RubyGems can be found here:
+
+     http://www.rubygems.org/
+
+
+0.3.2 - 2008-06-17
+------------------
+
+1. Serialisation, e.g. with Marshal and YAML, has been a problem until now.
+  
+   This is because subclasses of Amazon::AWS::AWSObject are created as needed
+   when XML responses from AWS are parsed. Whilst there is no problem dumping
+   objects instantiated from such classes, the difficulty arises when later
+   loading and attempting to reinstantiate them in a new process, because the
+   dynamic classes from which they were spawned no longer exist.
+
+   The solution to the problem comes in the form of the new methods
+   Amazon::AWS::AWSObject.load and Amazon::AWS::AWSObject.yaml_load. Use these
+   as alternatives to Marshal.load and YAML.load, respectively.
+
+
+0.3.1 - 2008-06-10
+------------------
+
+This release mostly features refinements to the support for remote
+shopping-carts.
+
+1. The 'Save For Later' area of remote shopping-carts is now implemented.
+
+   Cart#cart_modify now takes an extra parameter, save_for_later. If true,
+   items are moved from the active to the Save For Later area of the cart. If
+   false, they are moved in the opposite direction.
+
+   In both cases, the quantity parameter is ignored, because attempting to
+   pass it through to AWS results in an error, even though the AWS
+   documentation claims this can be done to move partial quantities from one
+   area of the cart to the other.
+
+2. Cart objects now have a @saved_for_later_items attribute, aliased to
+   @saved_items and @saved for brevity. Take your pick.
+
+3. @cart_items is now set to [] when Cart.new is called. Previously, it wasn't
+   set until Cart#cart_create was used, at which time it was set to nil.
+   @saved_for_later_items is also set to [] by Cart.new.
+
+4. Cart#include? now also returns true if the item being queried is in the
+   Save For Later area of the cart. Previously, only the active area was
+   inspected.
+
+5. New methods, Cart#active? and Cart#saved_for_later? (alias Cart#saved?),
+   return whether or not an item is present in a particular area of the cart.
+   If the item is present, its CartItemId is returned; otherwise 'false'.
+
+6. A bug that caused shopping-cart transactions to use the cache if one was
+   requested has been fixed. Shopping-carts should never use the cache under
+   any circumstances.
+
+7. Request objects can now have their @cache attribute assigned to. A Cache
+   object may be directly assigned to it, or you may assign the value 'true'.
+   If @cache is set to 'true', a Cache object will automatically be assigned
+   to it the next time @cache is referenced. This is most useful when one
+   wishes to switch from using no cache to using one, or vice versa.
+
+8. Cache#flush_expired invariably threw an exception. This bug has been fixed.
+
+9. Geolocation of users by host and IP address now raises an
+   Amazon::Locale::GeoError exception if the host or IP address is
+   unresolvable.
+
+There's a new Ruby/AWS mailing-list for discussion of the development and
+usage of this library:
+
+  http://www.caliban.org/mailman/listinfo/ruby-aws
+
+
+0.3.0 - 2008-05-19
+------------------
+
+1. The version of the Amazon AWS API requested when performing operations is
+   now 2008-04-07. This is the latest at the time of writing.
+
+2. Remote shopping-carts are now implemented. See the
+   Amazon::AWS::ShoppingCart module and the Amazon::AWS::ShoppingCart::Cart
+   class in ./amazon/aws/shoppingcart.rb for more details.
+
+   Basically, the new methods are Cart.new, Cart#cart_create, Cart#cart_add,
+   Cart#cart_modify and Cart#cart_clear. There's also Cart#each for iterating
+   over the items in a cart.
+
+   This adds the following AWS operations to the list of those supported:
+
+     CartCreate
+     CartAdd
+     CartModify
+     CartClear
+
+   It's currently not possible to update a wishlist at purchase time by
+   referring to the item's ListItemId when adding it to a cart.
+
+   It's also currently not possible to add items to the 'Saved For Later'
+   section of the cart.
+
+3. A new iterator method, AWSObject#each, yields each |property, value| of the
+   AWSObject.
+
+4. The AWSObject and AWSArray classes have received a few new helper methods
+   that should make AWSObject and single element AWSArray objects behave more
+   akin to strings when they are being compared with strings, matched against
+   regexes, etc.
+
+5. An otherwise undocumented method, AWSObject#kernel, provides unnested (i.e.
+   top level) AWSObject objects with a shortcut reference to the data most
+   likely of interest to the user.
+
+   For example, if a top level AWSObject is formed as the result of an
+   ItemSearch, one might normally refer to the items returned with something
+   like this:
+
+     foo.item_search_response[0].items[0].item
+
+   AWSObject#kernel allows the same data to be referred to as follows:
+
+     foo.kernel
+
+   The path to the data is programatically determined, so this method only
+   works for top level AWSObject objects created by a class of operation whose
+   name can be used to derive the path. This is why this method is not
+   mentioned in the RDoc documentation.
+
+6. When searches are performed, greater efforts are now made to determine
+   whether Amazon returned any errors. In particular, batch operations and
+   MultipleOperations may return errors at different locations in the XML tree
+   than normal operations.
+
+7. A bug that materialised only when using an HTTP proxy has been fixed.
+
+
+0.2.0 - 2008-04-28
+------------------
+
+1. In previous versions, only 5 types of operation were supported:
+   
+     BrowseNodeLookup
+     ItemLookup
+     ItemSearch
+     ListSearch
+     SellerListingSearch
+   
+   This version supports all remaining non-shopping-cart operations:
+   
+     CustomerContentLookup
+     CustomerContentSearch
+     Help
+     ListLookup
+     SellerListingSearch
+     SellerLookup
+     SimilarityLookup
+     TagLookup
+     TransactionLookup
+   
+   Examples of each of these can be found in ./examples/
+   
+   It is hoped that shopping-carts will make their debut in the next release
+   of Ruby/AWS.
+
+2. One can now use a Symbol for search indices and hash keys when
+   instantiating operation objects and response group objects.
+
+   For example:
+
+     is = ItemSearch.new( 'Books', { 'Title' => 'Ruby' } )
+     rg = ResponseGroup.new( 'Large' )
+
+   can now be written like this:
+
+     is = ItemSearch.new( :Books, { :Title => 'Ruby' } )
+     rg = ResponseGroup.new( :Large )
+
+   It's up to you which form you use. The Symbol form saves one character. :-)
+
+3. AWSObject#to_s has been improved to provide something better looking.
+   There's still room for improvement, though.
+
+4. AWSObject#to_i has been added. This allows, for example, AWSObjects to be
+   used with the %d format specifier in formatted strings. It's up to you,
+   though, to know when an AWSObject can be expected to contain a String
+   that's usable as an Integer.
+
+5. Objects of a class whose name matches AWSObject::.*Image typically have a
+   @url attribute that points to the URL of the image in question. Such
+   objects now have a #get method, which can be used to retrieve the image in
+   question. This method takes a single parameter, an integer precentage,
+   which causes the retrieved image to be overlayed with a discount icon.
+
+6. Various compatibility fixes were made to allow Ruby/AWS to work under Ruby
+   1.9. The use of Ruby/AWS with this version is still not recommended,
+   however. For one thing, Ruby 1.9 seems to use #inspect in places that Ruby
+   1.8 used #to_s.
+
+
+0.1.0 - 2008-04-11
+------------------
+
+1. Version 0.1.0 of Ruby/AWS has undergone fundamental changes from the
+   previous, very crude versions, 0.0.1 and 0.0.2.
+
+   For one thing, the AWS XML parser has been completely rewritten. In this
+   new version, classes are dynamically generated as required, based on the
+   elements present in the XML pages returned by AWS.
+
+   Previous versions of Ruby/AWS (and also Ruby/Amazon), manually defined most
+   of these classes, based on Amazon's developer documentation and examination
+   of AWS XML reponses. This time-consuming, unwieldy and unnecessary approach
+   was largely the result of my own lack of aptitude with the Ruby REXML
+   library.
+
+   While these manually defined classes accounted for much of the data
+   returned by AWS, a smaller section of the data was, nevertheless,
+   dynamically converted to Ruby data structures. This mix of manually and
+   automatically treated objects led to inconsistencies in the Ruby
+   representation of the hierarchical XML structure. This meant that it was
+   not quite possible to look at an AWS XML response and reliably determine
+   how the resulting Ruby data structure would look.
+
+   That inconsistency has been ironed out in version 0.1.0. As of now,
+   _everything_ is dynamically generated from the AWS XML response. All manual
+   class definitions have been removed and all classes are now defined at the
+   time they first need to be instantiated.
+
+   This has the following advantages:
+
+     - Changes in the structure of AWS XML responses will not break Ruby/AWS.
+       They may break user code (if, for example, you depend on the presence
+       of a piece of data that later disappears from AWS responses [and even
+       this should not happen, because AWS v4 has a versioned API]), but they
+       will not break the library. The library will always create whichever
+       classes are needed to represent any given XML structure returned by
+       AWS.
+
+     - Changes in the structure of AWS XML that results in new data being
+       included in responses will automatically cause said data to be made
+       available via Ruby/AWS. If, for example, Amazon starts to return data
+       about the duration of each CD in their catalogue, perhaps using a
+       <Duration> tag, foo.duration would automatically start to return that
+       property.
+
+     - It should be faster, but I haven't verified this.
+
+2. Multiple operations are now supported.
+
+3. Geolocation of locale is now working.
+
+4. Documentation in this version has been radically improved, but is still
+   lacking.

@@ -1,0 +1,22 @@
+#!/usr/bin/ruby -w
+#
+# $Id: vehicle_search,v 1.2 2010/02/20 16:49:14 ianmacd Exp $
+
+require 'amazon/aws/search'
+
+include Amazon::AWS
+include Amazon::AWS::Search
+
+vs = VehicleSearch.new( { 'Year' => 2008 } )
+vs.response_group = ResponseGroup.new( 'VehicleMakes' )
+
+req = Request.new
+req.locale = 'us'
+
+resp = req.search( vs )
+makes = resp.vehicle_search_response[0].vehicle_years[0].vehicle_year[0].
+        vehicle_makes[0].vehicle_make
+
+printf( "Search returned %d makes of vehicle for 2008.\n\n", makes.size )
+
+makes.each { |make| puts make, '' }
